@@ -11,6 +11,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
+# Models
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -25,8 +26,22 @@ class User(db.Model):
         self.password = password
         self.first_name = first_name
         self.last_name = last_name
-        self.age = age 
+        self.age = age
 
+class Item(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64))
+    quantity = db.Column(db.Integer)
+    priceType = db.Column(db.Enum("weight", "number", name="priceType"))
+    price = db.Column(db.Integer)
+
+    def __init__(self, name, quantity, priceType, price):
+        self.name = name
+        self.quantity = quantity
+        self.priceType = priceType
+        self.price = price
+
+# Schemas
 
 class UserSchema(ma.Schema):
     class Meta: 
@@ -35,6 +50,13 @@ class UserSchema(ma.Schema):
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
 
+class ItemSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'name', 'quantity', 'priceType', 'price')
+item_schema  = ItemSchema()
+items_schema = ItemSchema(many=True)
+
+# Routes
 
 class UserManager(Resource):
     @staticmethod
@@ -104,7 +126,32 @@ class UserManager(Resource):
         })
 
 
+class ItemManager(Resource):
+    @staticmethod
+    def get():
+        try: id = request.args['id']
+        except Exception as _: id = None
+        if not id:
+            items = Item.query.all()
+            return jsonify(items_schema.dump(items))
+        item = Item.query.get(id)
+        return jsonify(item_schema.dump(item))
+    @staticmethod
+    def post():
+        name = request.json['name']
+        quantity = request.json['quantity']
+        priceType = request.json['priceType']
+        price = request.json['price']
+
+        item = Item(name, quantity, priceType, price)
+        db.session.add(item)
+        db.session.commit()
+        return jsonify({
+            'Message': f'Item {name} inserted.'
+        })
+
 api.add_resource(UserManager, '/api/users')
+api.add_resource(ItemManager, '/api/items')
 
 if __name__ == '__main__':
     app.run(debug=True)
